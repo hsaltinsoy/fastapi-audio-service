@@ -133,8 +133,6 @@ def validate_payload(payload: AudioPayload) -> bool:
             validate_timestamp(payload.timestamp) and
             validate_audio_file(payload.audio_files)):
         return True
-    else:
-        return False
 
 
 @app.post("/process-audio")
