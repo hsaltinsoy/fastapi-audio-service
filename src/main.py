@@ -5,7 +5,6 @@ import os
 import numpy as np
 import re
 from fastapi import FastAPI, HTTPException
-from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from typing import List
 
