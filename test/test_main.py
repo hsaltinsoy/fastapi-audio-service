@@ -23,7 +23,9 @@ def setup_and_teardown():
 
 # Function to create a base64 encoded audio file
 def encode_audio() -> bytes:
-    return base64.b64encode(np.random.randint(-32768, 32767, 4000, dtype=np.int16).tobytes())
+    return base64.b64encode(
+        np.random.randint(-32768, 32767, 4000, dtype=np.int16).tobytes()
+    )
 
 
 # Function to create a non base64 encoded audio file
@@ -38,7 +40,9 @@ def test_process_audio():
     payload = AudioPayload(
         session_id="test-session",
         timestamp="2025-01-02T12:00:00Z",
-        audio_files=[AudioFile(file_name="test_audio.wav", encoded_audio=encoded_audio)],
+        audio_files=[
+            AudioFile(file_name="test_audio.wav", encoded_audio=encoded_audio)
+        ],
     )
 
     client = TestClient(app)
@@ -86,7 +90,9 @@ def test_invalid_base64_audio():
     payload = AudioPayload(
         session_id="test-session",
         timestamp="2025-01-02T12:00:00Z",
-        audio_files=[AudioFile(file_name="test_audio.wav", encoded_audio=encoded_audio)],
+        audio_files=[
+            AudioFile(file_name="test_audio.wav", encoded_audio=encoded_audio)
+        ],
     )
 
     client = TestClient(app)
@@ -103,7 +109,9 @@ def test_invalid_timestamp_format():
     payload = AudioPayload(
         session_id="test-session",
         timestamp="2025-01-02T12:00:00",  # Invalid timestamp format
-        audio_files=[AudioFile(file_name="test_audio.wav", encoded_audio=encoded_audio)],
+        audio_files=[
+            AudioFile(file_name="test_audio.wav", encoded_audio=encoded_audio)
+        ],
     )
 
     client = TestClient(app)

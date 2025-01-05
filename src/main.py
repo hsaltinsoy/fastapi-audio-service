@@ -8,7 +8,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
 
-from exceptions import ExceptionCustom
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -68,7 +67,9 @@ def calculate_audio_length(audio_array: np.ndarray, sample_rate: int) -> float:
     return len(audio_array) / sample_rate
 
 
-def store_audio_metadata(session_id: str, timestamp: str, file_name: str, length_seconds: float):
+def store_audio_metadata(
+    session_id: str, timestamp: str, file_name: str, length_seconds: float
+):
     """
     Stores audio metadata in the SQLite database.
 
@@ -83,10 +84,13 @@ def store_audio_metadata(session_id: str, timestamp: str, file_name: str, length
     """
     try:
         with sqlite3.connect(DATABASE) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO audio_metadata (session_id, timestamp, file_name, length_seconds)
                 VALUES (?, ?, ?, ?)
-            """, (session_id, timestamp, file_name, length_seconds))
+            """,
+                (session_id, timestamp, file_name, length_seconds),
+            )
             conn.commit()
         logger.info(f"Metadata stored successfully for file: {file_name}")
     except Exception as e:
@@ -95,27 +99,66 @@ def store_audio_metadata(session_id: str, timestamp: str, file_name: str, length
 
 
 def validate_audio_files_present(audio_files: list[AudioFile]):
+    """
+    Validates that the list of audio files is not empty.
+
+    Args:
+        audio_files (List[AudioFile]): List of audio files to validate.
+
+    Raises:
+        ExceptionCustom: If the list of audio files is empty.
+
+    Returns:
+        bool: True if the list contains audio files.
+    """
     if not audio_files:
-        raise ExceptionCustom(status_code=400, detail="No audio files provided!")
+        raise HTTPException(status_code=400, detail="No audio files provided!")
     return True
 
 
 def validate_timestamp(timestamp: str):
+    """
+    Validates that the timestamp string matches the ISO 8601 format.
+
+    Args:
+        timestamp (str): The timestamp string to validate.
+
+    Raises:
+        ExceptionCustom: If the timestamp format is invalid.
+
+    Returns:
+        bool: True if the timestamp format is valid.
+    """
     timestamp_pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$"
     if not re.fullmatch(timestamp_pattern, timestamp):
-        raise ExceptionCustom(status_code=400, detail="Invalid timestamp format!")
+        raise HTTPException(status_code=400, detail="Invalid timestamp format!")
     return True
 
 
 def validate_audio_file(audio_files: list[AudioFile]):
+    """
+    Validates that each audio file's base64 encoding is valid.
+
+    Args:
+        audio_files (List[AudioFile]): List of audio files to validate.
+
+    Raises:
+        ExceptionCustom: If any audio file has invalid base64 encoding.
+
+    Returns:
+        bool: True if all audio files are valid.
+    """
     for audio_file in audio_files:
         try:
             decoded = base64.b64decode(audio_file.encoded_audio, validate=True)
             if base64.b64encode(decoded).decode() == audio_file.encoded_audio:
                 return True
         except Exception as e:
-            logger.warning(f"Base64 validation error for file {audio_file.file_name}: {e}")
-            raise ExceptionCustom(status_code=400, detail="Invalid base64 encoding file!")
+            logger.warning(
+                f"Base64 validation error for file {audio_file.file_name}: {e}"
+            )
+            raise HTTPException(
+                status_code=400, detail="Invalid base64 encoding file!")
 
 
 def validate_payload(payload: AudioPayload) -> bool:
@@ -128,10 +171,11 @@ def validate_payload(payload: AudioPayload) -> bool:
     Returns:
         bool: True if the payload is valid, False otherwise.
     """
-    if (validate_audio_files_present(payload.audio_files) and
-            validate_timestamp(payload.timestamp) and
-            validate_audio_file(payload.audio_files)):
-        return True
+    return (
+        validate_audio_files_present(payload.audio_files)
+        and validate_timestamp(payload.timestamp)
+        and validate_audio_file(payload.audio_files)
+    )
 
 
 @app.post("/process-audio")
@@ -149,30 +193,35 @@ async def process_audio(payload: AudioPayload):
     processed_files = []
 
     if not validate_payload(payload):
-        return {
-            "status": "error",
-            "message": "Invalid audio file metadata or payload."
-        }
+        return {"status": "error", "message": "Invalid audio file metadata or payload."}
 
     for audio_file in payload.audio_files:
         try:
-            audio_array = np.frombuffer(base64.b64decode(audio_file.encoded_audio), dtype=np.int16)
+            audio_array = np.frombuffer(
+                base64.b64decode(audio_file.encoded_audio), dtype=np.int16
+            )
             length_seconds = calculate_audio_length(audio_array, sample_rate)
 
-            store_audio_metadata(payload.session_id, payload.timestamp, audio_file.file_name, length_seconds)
+            store_audio_metadata(
+                payload.session_id,
+                payload.timestamp,
+                audio_file.file_name,
+                length_seconds,
+            )
 
-            processed_files.append({
-                "file_name": audio_file.file_name,
-                "length_seconds": round(length_seconds, 2)
-            })
+            processed_files.append(
+                {
+                    "file_name": audio_file.file_name,
+                    "length_seconds": round(length_seconds, 2),
+                }
+            )
         except HTTPException as e:
             logger.error(f"Failed to process file {audio_file.file_name}: {e.detail}")
             continue
         except Exception as e:
-            logger.error(f"Unexpected error processing file {audio_file.file_name}: {e}")
+            logger.error(
+                f"Unexpected error processing file {audio_file.file_name}: {e}"
+            )
             continue
 
-    return {
-        "status": "success",
-        "processed_files": processed_files
-    }
+    return {"status": "success", "processed_files": processed_files}
